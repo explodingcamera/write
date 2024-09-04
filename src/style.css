@@ -1,4 +1,4 @@
-@import url("./fonts/libertinus/libertinus.css");
+@import url("./assets/fonts/libertinus/libertinus.css");
 
 :root {
   --font-serif: "Libertinus Serif", serif;
@@ -61,6 +61,7 @@ main {
   color: inherit;
   background: none;
   font-family: inherit;
+  overflow-y: hidden;
 }
 /* 
 main::before {
