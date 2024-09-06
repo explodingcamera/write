@@ -1,103 +1,114 @@
 import { debounce } from "../utils";
+import { smartQuotes } from "./features";
 import { EditorHistory } from "./history";
+import { createNanoEvents, type Emitter } from "nanoevents";
+
+interface Events {
+	save: (text: string) => void;
+	wordCountChange: (count: number) => void;
+}
 
 export class Editor {
-	history: EditorHistory;
-	editor: HTMLInputElement;
-	historyTimeout: Timer | null = null;
+	#events: Emitter<Events>;
+	#history: EditorHistory;
+	#editor: HTMLInputElement;
+	#historyInterval: number | null = null;
+	#historyTimeout: Timer | null = null;
 
 	constructor({ editor }: { editor: HTMLInputElement }) {
-		this.editor = editor;
-		this.editor.addEventListener("beforeinput", this.handleBeforeInput);
-		this.editor.addEventListener("input", this.handleInput as EventListener);
-		this.editor.addEventListener("keydown", this.handleKeydown);
+		this.#events = createNanoEvents();
 
-		editor.value = localStorage.getItem("text") ?? "";
+		this.#editor = editor;
+		this.#editor.addEventListener("beforeinput", this.#handleBeforeInput);
+		this.#editor.addEventListener("paste", this.#handlePaste);
+		this.#editor.addEventListener("input", this.#handleInput as EventListener);
+		this.#editor.addEventListener("keydown", this.#handleKeydown);
+		window.addEventListener("beforeunload", this.#handleSave);
 
-		this.history = new EditorHistory(editor.value);
-		this.resize();
-		this.focus();
-
-		window.addEventListener("beforeunload", () => {
-			localStorage.setItem("text", this.editor.value);
-		});
+		this.#history = new EditorHistory(this.#editor.value);
 
 		setInterval(() => {
-			this.pushHistory();
+			this.#pushHistory();
 		}, 2000);
 	}
 
-	pushHistory = () => this.history.push(this.editor.value);
-	focus = () => this.editor.focus();
+	unload = () => {
+		this.#editor.removeEventListener("beforeinput", this.#handleBeforeInput);
+		this.#editor.removeEventListener("paste", this.#handlePaste);
+		this.#editor.removeEventListener("input", this.#handleInput as EventListener);
+		this.#editor.removeEventListener("keydown", this.#handleKeydown);
+		window.removeEventListener("beforeunload", this.#handleSave);
 
-	handleKeydown = (event: KeyboardEvent) => {
+		if (this.#historyTimeout) clearTimeout(this.#historyTimeout);
+		if (this.#historyInterval) clearInterval(this.#historyInterval);
+		this.#historyInterval = null;
+		this.#historyTimeout = null;
+	};
+
+	on<E extends keyof Events>(event: E, callback: Events[E]) {
+		return this.#events.on(event, callback);
+	}
+
+	focus = () => this.#editor.focus();
+
+	loadText = (text: string) => {
+		if (this.#historyTimeout) clearTimeout(this.#historyTimeout);
+		if (this.#historyInterval) clearInterval(this.#historyInterval);
+		this.#editor.value = text;
+		this.#history = new EditorHistory(this.#editor.value);
+		this.#resize();
+		this.focus();
+	};
+
+	#handleSave = () => {
+		this.#events.emit("save", this.#editor.value);
+	};
+
+	#pushHistory = () => this.#history.push(this.#editor.value);
+
+	#handleKeydown = (event: KeyboardEvent) => {
 		if (event.key === "Tab") {
-			console.log("tab");
-
 			event.preventDefault();
-			this.pushHistory();
-			this.editor.setRangeText(
-				"  ",
-				this.editor.selectionStart ?? 0,
-				this.editor.selectionEnd ?? 0,
-				"end",
-			);
+			this.#pushHistory();
+			this.#editor.setRangeText("  ", this.#editor.selectionStart ?? 0, this.#editor.selectionEnd ?? 0, "end");
 		}
 
 		if (event.key === "z" && (event.metaKey || event.ctrlKey)) {
 			event.preventDefault();
 			if (event.shiftKey) {
-				this.editor.value = this.history.redo();
+				this.#editor.value = this.#history.redo();
 			} else {
-				this.editor.value = this.history.undo();
+				this.#editor.value = this.#history.undo();
 			}
-			this.resize();
+			this.#resize();
 		}
 		if (event.key === "y" && (event.metaKey || event.ctrlKey)) {
 			event.preventDefault();
-			this.editor.value = this.history.redo();
-			this.resize();
+			this.#editor.value = this.#history.redo();
+			this.#resize();
 		}
 	};
 
-	onWordCountChange = (callback: (count: number) => void) => {
-		this.editor.addEventListener("input", () => {
-			const text = this.editor.value;
-			if (text.length === 0 || text.trim().length === 0) {
-				callback(0);
-				return;
-			}
-
-			const words = text.trim().split(/\s+/).length;
-			callback(words);
-		});
+	#resize = () => {
+		this.#editor.style.height = "auto";
+		this.#editor.style.height = `${this.#editor.scrollHeight}px`;
 	};
 
-	resize = () => {
-		this.editor.style.height = "auto";
-		this.editor.style.height = `${this.editor.scrollHeight}px`;
-	};
-
-	handlePaste = (event: ClipboardEvent) => {
+	#handlePaste = (event: ClipboardEvent) => {
 		event.preventDefault();
 		const text = event.clipboardData?.getData("text/plain") ?? "";
-		this.editor.setRangeText(
-			text,
-			this.editor.selectionStart ?? 0,
-			this.editor.selectionEnd ?? 0,
-			"end",
-		);
-		this.resize();
+		this.#editor.setRangeText(text, this.#editor.selectionStart ?? 0, this.#editor.selectionEnd ?? 0, "end");
+		this.#resize();
 	};
 
-	handleBeforeInput = (event: InputEvent) => {
-		const selectionStart = this.editor.selectionStart ?? 0;
-		const selectionEnd = this.editor.selectionEnd ?? 0;
+	#handleBeforeInput = (event: InputEvent) => {
+		const selectionStart = this.#editor.selectionStart ?? 0;
+		const selectionEnd = this.#editor.selectionEnd ?? 0;
 
 		if (selectionEnd - selectionStart > 0) {
 			if (["*", "_", "~", '"'].includes(event.data ?? "")) {
 				event.preventDefault();
-				this.pushHistory();
+				this.#pushHistory();
 
 				let prefix = event.data;
 				let suffix = event.data;
@@ -107,119 +118,74 @@ export class Editor {
 					suffix = "”";
 				}
 
-				this.editor.setRangeText(
-					prefix +
-						this.editor.value.substring(selectionStart, selectionEnd) +
-						suffix,
+				this.#editor.setRangeText(
+					prefix + this.#editor.value.substring(selectionStart, selectionEnd) + suffix,
 					selectionStart,
 					selectionEnd,
 					"end",
 				);
 
 				// select the text inside the formatting
-				this.editor.setSelectionRange(selectionStart + 1, selectionEnd + 1);
+				this.#editor.setSelectionRange(selectionStart + 1, selectionEnd + 1);
 			}
 		}
 	};
 
-	handleInput = (event: InputEvent) => {
-		this.resize();
-		const text = this.editor.value;
+	#saveDebounced = debounce(() => {
+		this.#events.emit("save", this.#editor.value);
+	});
 
-		debounce(() => {
-			localStorage.setItem("text", text);
-		})();
+	#handleInput = (event: InputEvent) => {
+		this.#resize();
+		const text = this.#editor.value;
 
-		if (this.editor.selectionStart === this.editor.value.length) {
+		if (text.length === 0 || text.trim().length === 0) this.#events.emit("wordCountChange", 0);
+		this.#events.emit("wordCountChange", text.trim().split(/\s+/).length);
+
+		this.#saveDebounced();
+
+		if (this.#editor.selectionStart === this.#editor.value.length) {
 			window.scrollTo(0, document.body.scrollHeight);
 		}
 
 		if (event.inputType === "deleteContentBackward") {
-			this.historyTimeout = setTimeout(this.pushHistory, 200);
+			this.#historyTimeout = setTimeout(this.#pushHistory, 200);
 		}
 
 		if (event.inputType === "insertText") {
-			const position = this.editor.selectionStart ?? 0;
-			const text = this.editor.value;
+			const position = this.#editor.selectionStart ?? 0;
+			const text = this.#editor.value;
 
-			if (this.historyTimeout) clearTimeout(this.historyTimeout);
+			if (this.#historyTimeout) clearTimeout(this.#historyTimeout);
 			if (text === " ") {
-				this.historyTimeout = setTimeout(this.pushHistory, 200);
+				this.#historyTimeout = setTimeout(this.#pushHistory, 200);
 			} else {
-				this.historyTimeout = setTimeout(this.pushHistory, 500);
+				this.#historyTimeout = setTimeout(this.#pushHistory, 500);
 			}
 
 			// ellipsis
 			if (event.data === ".") {
 				if (text[position - 2] === "." && text[position - 3] === ".") {
-					this.editor.setRangeText("…", position - 3, position, "end");
+					this.#editor.setRangeText("…", position - 3, position, "end");
 				}
 			}
 
 			// em dash
 			if (event.data === "-" && text[position - 2] === "-") {
-				this.editor.setRangeText("—", position - 2, position, "end");
+				this.#editor.setRangeText("—", position - 2, position, "end");
 			}
 
 			// << and >>
 			if (event.data === ">" && text[position - 2] === ">") {
-				this.editor.setRangeText("»", position - 2, position, "end");
+				this.#editor.setRangeText("»", position - 2, position, "end");
 			}
 
 			if (event.data === "<" && text[position - 2] === "<") {
-				this.editor.setRangeText("«", position - 2, position, "end");
+				this.#editor.setRangeText("«", position - 2, position, "end");
 			}
 
 			// smart quotes
-			if (event.data === '"') {
-				// check if the inserted character is a quote
-				let prevQuotePosition = position - 2;
-				let foundMatchingQuote = false;
-				let newlines = 0;
-
-				// Loop backwards from the current position to find the previous matching quote
-				while (prevQuotePosition >= 0) {
-					const charBefore =
-						prevQuotePosition === 0 ? undefined : text[prevQuotePosition - 1];
-
-					const char = text[prevQuotePosition];
-
-					if (char === "\n") {
-						newlines++;
-					}
-
-					if (newlines > 5) {
-						break;
-					}
-
-					if (
-						char === '"' &&
-						(charBefore === " " ||
-							charBefore === "\n" ||
-							charBefore === undefined)
-					) {
-						foundMatchingQuote = true;
-						break;
-					}
-
-					if (char === "”" || char === "“" || char === '"') {
-						break;
-					}
-
-					prevQuotePosition--;
-				}
-
-				// Only replace quotes if a matching quote was found
-				if (foundMatchingQuote) {
-					this.editor.setRangeText(
-						"“",
-						prevQuotePosition,
-						prevQuotePosition + 1,
-						"end",
-					); // replace previous with opening quote
-					this.editor.setRangeText("”", position - 1, position, "end"); // replace current with closing quote
-				}
-			}
+			smartQuotes(event.data, position, this.#editor);
 		}
 
 		if (event.inputType === "insertLineBreak") {
@@ -232,20 +198,20 @@ export class Editor {
 				const trimmedLastLine = lastLine.trim();
 
 				if (trimmedLastLine === fullPrefix.trim()) {
-					this.editor.value = `${text.substring(0, text.length - fullPrefix.length - 1)}\n`;
+					this.#editor.value = `${text.substring(0, text.length - fullPrefix.length - 1)}\n`;
 				} else {
 					let newPrefix = fullPrefix;
 					const match = Number.parseInt(prefixMatch[1]);
 					if (!Number.isNaN(match)) {
 						newPrefix = `${match + 1}. `;
 					}
-					this.editor.value += newPrefix;
+					this.#editor.value += newPrefix;
 				}
 
 				event.preventDefault();
 			}
 
-			this.pushHistory();
+			this.#pushHistory();
 		}
 	};
 }

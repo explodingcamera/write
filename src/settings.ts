@@ -11,8 +11,6 @@ export class Settings {
 			? "dark"
 			: "light";
 
-		console.log(initialTheme);
-
 		this.theme =
 			(localStorage.getItem("theme") as "light" | "dark") ?? initialTheme;
 
