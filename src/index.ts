@@ -28,3 +28,16 @@ editor.on("wordCountChange", (count) => (document.querySelector("#word-count spa
 document.getElementById("font-family")!.addEventListener("click", settings.toggleFont);
 document.querySelector(".theme-toggle")!.addEventListener("click", settings.toggleTheme);
 document.body.addEventListener("click", (event) => event.target === document.body && editor.focus());
+
+const modal = document.getElementById("files")! as HTMLDialogElement;
+
+modal.addEventListener("click", async (event) => {
+	const rect = modal.getBoundingClientRect();
+	const isOutside =
+		event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom;
+	if (isOutside) modal.close();
+});
+
+document.getElementById("files-toggle")!.addEventListener("click", async () => {
+	modal.showModal();
+});
