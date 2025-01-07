@@ -3,22 +3,18 @@ export class Settings {
 	font: "serif" | "sans-serif" | "monospace";
 	themeToggle: HTMLButtonElement;
 
-	constructor({ themeToggle }: { themeToggle: HTMLButtonElement }) {
+	constructor({ themeToggle, fontFamily }: { themeToggle: HTMLButtonElement; fontFamily: HTMLButtonElement }) {
 		this.themeToggle = themeToggle;
 
-		const initialTheme = window.matchMedia("(prefers-color-scheme: dark)")
-			.matches
-			? "dark"
-			: "light";
+		const initialTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 
-		this.theme =
-			(localStorage.getItem("theme") as "light" | "dark") ?? initialTheme;
+		this.theme = (localStorage.getItem("theme") as "light" | "dark") ?? initialTheme;
 
-		this.font =
-			(localStorage.getItem("font") as "serif" | "sans-serif" | "monospace") ??
-			"serif";
+		this.font = (localStorage.getItem("font") as "serif" | "sans-serif" | "monospace") ?? "serif";
 
 		this.apply();
+		themeToggle.addEventListener("click", this.toggleTheme);
+		fontFamily.addEventListener("click", this.toggleFont);
 	}
 
 	save = () => {

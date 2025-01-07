@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>write</title>
     <link rel="stylesheet" href="./src/css/style.css" />
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="mask-icon" href="/favicon.svg" color="#000000" />
   </head>
   <body>
     <dialog id="files">
@@ -36,6 +38,7 @@
           <rect width="7" height="7" x="3" y="14" rx="1" />
         </svg>
       </button>
+      <input id="filename" type="text" placeholder="Untitled" />
       <div class="space"></div>
       <button
         id="font-family"
@@ -84,7 +87,12 @@
       </button>
     </nav>
     <main>
-      <textarea placeholder="Write..." rows="1" id="editor"></textarea>
+      <textarea
+        autofocus
+        placeholder="Write..."
+        rows="1"
+        id="editor"
+      ></textarea>
     </main>
     <aside id="word-count">
       <span>0</span>

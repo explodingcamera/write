@@ -1,3 +1,4 @@
+import type { Files } from "../files";
 import { debounce } from "../utils";
 import { smartQuotes } from "./features";
 import { EditorHistory } from "./history";
@@ -15,7 +16,7 @@ export class Editor {
 	#historyInterval: number | null = null;
 	#historyTimeout: Timer | null = null;
 
-	constructor({ editor }: { editor: HTMLInputElement }) {
+	constructor({ files, editor }: { files: Files; editor: HTMLInputElement }) {
 		this.#events = createNanoEvents();
 
 		this.#editor = editor;

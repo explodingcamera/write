@@ -1,0 +1,10 @@
+#files {
+	border: none;
+	background-color: var(--color-bg);
+
+	&::backdrop {
+		background-color: rgba(0, 0, 0, 0.3);
+		backdrop-filter: blur(2px);
+		cursor: default;
+	}
+}
